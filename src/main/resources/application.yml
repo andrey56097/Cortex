@@ -12,9 +12,6 @@ spring:
       ddl-auto: none
     show-sql: true
 
-  liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.xml
-
 management:
   endpoints:
     web:
