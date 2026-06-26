@@ -19,7 +19,7 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 | 0 | Environment Setup | ✅ | Java 17, Docker, Git, Gradle wrapper |
 | 1 | Project Generation | ✅ | Spring Boot 4.1.0 with core dependencies |
 | 2 | Swagger / OpenAPI | ✅ | springdoc 2.8.6 + Lombok added |
-| 3 | MVC Structure | ⏳ | |
+| 3 | MVC Structure | ✅ | model, repository, service, controller, dto, exception |
 | 4 | Configuration | ⏳ | |
 | 5 | Local Run | ⏳ | |
 | 6 | Tests | ⏳ | |
@@ -59,18 +59,18 @@ git --version
 
 | Method | Path | Action | Status |
 |--------|------|--------|--------|
-| POST | `/api/tasks` | Create a task | ⏳ |
-| GET | `/api/tasks` | List all tasks | ⏳ |
-| GET | `/api/tasks/{id}` | Get task by ID | ⏳ |
-| GET | `/api/tasks?status=` | Filter by status | ⏳ |
-| PUT | `/api/tasks/{id}` | Update a task | ⏳ |
-| DELETE | `/api/tasks/{id}` | Delete a task | ⏳ |
+| POST | `/api/tasks` | Create a task | ✅ |
+| GET | `/api/tasks` | List all tasks | ✅ |
+| GET | `/api/tasks/{id}` | Get task by ID | ✅ |
+| GET | `/api/tasks?status=` | Filter by status | ✅ |
+| PUT | `/api/tasks/{id}` | Update a task | ✅ |
+| DELETE | `/api/tasks/{id}` | Delete a task | ✅ |
 
 ### Utility endpoints
 
 | Path | Description | Status |
 |------|-------------|--------|
-| `/swagger-ui.html` | Swagger UI | ⏳ |
+| `/swagger-ui.html` | Swagger UI | ✅ |
 | `/actuator/health/liveness` | Kubernetes liveness probe | ⏳ |
 | `/actuator/health/readiness` | Kubernetes readiness probe | ⏳ |
 
