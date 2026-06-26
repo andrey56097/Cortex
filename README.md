@@ -22,7 +22,7 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 | 3 | MVC Structure | ✅ | model, repository, service, controller, dto, exception |
 | 4 | Configuration | ✅ | application.yml + Liquibase migrations |
 | 5 | Local Run | ✅ | All CRUD endpoints verified, Swagger UI, Liquibase migration |
-| 6 | Tests | ⏳ | |
+| 6 | Tests | ✅ | 20/20 pass (Service: 9, Controller: 10, Context: 1) |
 | 7 | Dockerfile | ⏳ | |
 | 8 | Docker Compose | ⏳ | |
 | 9 | Kubernetes | ⏳ | |
@@ -111,10 +111,19 @@ cortex/
 | Framework | Spring Boot 4.1.0 |
 | Build | Gradle (via wrapper) |
 | Database | PostgreSQL 16 |
+| Migrations | Liquibase |
 | API Docs | Swagger / OpenAPI (springdoc) |
 | Container | Docker (multi-stage build) |
 | Orchestration | Kubernetes / Minikube |
 | CI/CD | GitHub Actions → ghcr.io → kind |
+
+## 🧪 Testing
+
+| Layer | Framework | Tests |
+|-------|-----------|-------|
+| Service | JUnit 5 + Mockito | 9 (all CRUD + edge cases) |
+| Controller | JUnit 5 + Mockito + MockMvc standalone | 10 (all endpoints + validation + 404) |
+| Context | Spring Boot Test | 1 (application context loads)
 
 ---
 
