@@ -24,7 +24,7 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 | 5 | Local Run | ✅ | All CRUD endpoints verified, Swagger UI, Liquibase migration |
 | 6 | Tests | ✅ | 20/20 pass (Service: 9, Controller: 10, Context: 1) |
 | 7 | Dockerfile | ✅ | Multi-stage build, 168MB image, verified |
-| 8 | Docker Compose | ⏳ | |
+| 8 | Docker Compose | ✅ | app + PostgreSQL, single command, verified |
 | 9 | Kubernetes | ⏳ | |
 | 10 | CI/CD | ⏳ | |
 
@@ -48,6 +48,9 @@ git --version
 
 # Run tests
 ./gradlew test
+
+# Start with Docker Compose (app + PostgreSQL)
+docker compose up --build
 
 # Start development server (requires PostgreSQL on localhost:5432)
 ./gradlew bootRun
