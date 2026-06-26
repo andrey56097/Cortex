@@ -1,107 +1,111 @@
-# План проекта: Task Manager API
-**Стек:** Java 17 + Spring Boot 3.5.x + Gradle + PostgreSQL + Swagger/OpenAPI + Docker + Kubernetes + GitHub Actions CI/CD
+# Project Plan: Task Manager API
+**Stack:** Java 17 + Spring Boot 4.1.0 + Gradle + PostgreSQL 16 + Liquibase + Swagger/OpenAPI + Docker + Kubernetes + GitHub Actions CI/CD
 
-Цель — пройти весь путь от кода до деплоя в Kubernetes через CI/CD пайплайн, чтобы на практике понять, как эти технологии связаны друг с другом.
+The goal is to walk the entire path from code to deployment in Kubernetes through a CI/CD pipeline, understanding how each technology connects to the next.
 
 ---
 
-## Этап 0. Подготовка окружения
+## Phase 0. Environment Setup
 
-Установи и проверь версии:
+Check installed versions:
 
 ```bash
-java -version        # нужен 17+
+java -version        # needs 17+
 docker --version
 docker compose version
 git --version
 ```
 
-Инструменты для следующих этапов (можно поставить сейчас или по ходу):
-- **Gradle** — можно не ставить отдельно, проект сгенерирует gradle wrapper (`gradlew`)
+Tools for later phases (can install now or as needed):
+- **Gradle** — no separate install needed, the project includes a Gradle wrapper (`gradlew`)
 - **Minikube** — https://minikube.sigs.k8s.io/docs/start/
 - **kubectl** — https://kubernetes.io/docs/tasks/tools/
-- **GitHub аккаунт** — для CI/CD и ghcr.io (Container Registry)
+- **GitHub account** — for CI/CD and ghcr.io (Container Registry)
 
-> **kind** не нужен локально — он автоматически создается в CI через `helm/kind-action`.
+> **kind** is not needed locally — it's created automatically in CI via `helm/kind-action`.
 
 ---
 
-## Этап 1. Генерация проекта
+## Phase 1. Project Generation
 
-Иди на **https://start.spring.io** и выбери:
+Go to **https://start.spring.io** and select:
 
-| Поле | Значение |
+| Field | Value |
 |---|---|
 | Project | Gradle - Groovy |
 | Language | Java |
-| Spring Boot | 3.5.x (последняя стабильная из линии 3.x) |
-| Group | `com.example` |
-| Artifact | `task-manager` |
+| Spring Boot | Latest stable 4.x |
+| Group | `com.ortex` |
+| Artifact | `cortex` |
 | Java | 17 |
 
-**Dependencies (добавь через поиск):**
+**Dependencies (add via search):**
 - `Spring Web`
 - `Spring Data JPA`
 - `PostgreSQL Driver`
 - `Validation`
-- `Spring Boot Actuator` (даёт `/actuator/health` — понадобится для K8s liveness/readiness проб)
+- `Spring Boot Actuator` (provides `/actuator/health` — needed for K8s liveness/readiness probes)
 
-Скачай zip, разархивируй, открой в IDE (IntelliJ IDEA Community подходит отлично).
+Download the zip, extract it, open in IDE (IntelliJ IDEA Community works great).
 
-> Swagger в Initializr нет — добавим его вручную в `build.gradle` на следующем этапе.
+> Swagger is not available in Initializr — we add it manually in `build.gradle` in the next phase.
 
 ---
 
-## Этап 2. Зависимости в build.gradle
+## Phase 2. Dependencies in build.gradle
 
-Добавь вручную в блок `dependencies`:
+Manually add to the `dependencies` block:
 
 ```groovy
 // Swagger / OpenAPI
-implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
-// Lombok (опционально, но экономит много кода)
+// Lombok (optional, but saves a lot of boilerplate)
 compileOnly 'org.projectlombok:lombok'
 annotationProcessor 'org.projectlombok:lombok'
 
-// Liquibase (миграции схемы БД вместо ddl-auto)
-implementation 'org.liquibase:liquibase-core'
+// Liquibase (database schema migrations instead of ddl-auto)
+implementation 'org.liquibase:liquibase-core:4.30.0'
 ```
 
-После сохранения — Gradle подтянет зависимости (в IDE обычно автоматически, либо `./gradlew build`).
+After saving — Gradle resolves dependencies (IDE does this automatically, or run `./gradlew build`).
+
+> **Note:** Spring Boot 4.x removed auto-config for Liquibase. Create a `LiquibaseConfig.java` with `@Bean` returning `SpringLiquibase`.
 
 ---
 
-## Этап 3. Структура проекта (MVC)
+## Phase 3. Project Structure (MVC)
 
-Создай пакеты внутри `src/main/java/com/example/taskmanager/`:
+Create packages inside `src/main/java/com/ortex/cortex/`:
 
 ```
-taskmanager/
-├── TaskManagerApplication.java
+cortex/
+├── CortexApplication.java
 ├── model/
 │   ├── Task.java          // @Entity
 │   └── TaskStatus.java    // enum: TODO, IN_PROGRESS, DONE
 ├── repository/
 │   └── TaskRepository.java   // extends JpaRepository<Task, Long>
 ├── service/
-│   └── TaskService.java       // бизнес-логика, CRUD
+│   └── TaskService.java       // business logic, CRUD
 ├── controller/
-│   └── TaskController.java    // REST эндпоинты
+│   └── TaskController.java    // REST endpoints
 ├── dto/
-│   ├── TaskRequest.java       // что принимаем от клиента
-│   └── TaskResponse.java      // что отдаём клиенту
-└── exception/
-    ├── TaskNotFoundException.java
-    └── GlobalExceptionHandler.java   // @ControllerAdvice
+│   ├── TaskRequest.java       // what we accept from the client
+│   └── TaskResponse.java      // what we return to the client
+├── exception/
+│   ├── TaskNotFoundException.java
+│   └── GlobalExceptionHandler.java   // @ControllerAdvice
+├── config/
+│   └── LiquibaseConfig.java          // manual Liquibase @Configuration
 ```
 
-### Что должно быть в каждом слое
+### What each layer should contain
 
 **model/Task.java** — JPA Entity:
-- поля: `id`, `title`, `description`, `status` (enum), `createdAt`, `updatedAt`
-- аннотации: `@Entity`, `@Table(name = "tasks")`, `@Id`, `@GeneratedValue(strategy = GenerationType.IDENTITY)`
-- `@PrePersist` / `@PreUpdate` для авто-заполнения дат
+- fields: `id`, `title`, `description`, `status` (enum), `createdAt`, `updatedAt`
+- annotations: `@Entity`, `@Table(name = "tasks")`, `@Id`, `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- `@PrePersist` / `@PreUpdate` for auto-timestamps
 
 **repository/TaskRepository.java**:
 ```java
@@ -109,48 +113,50 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByStatus(TaskStatus status);
 }
 ```
-Spring Data JPA сам сгенерирует реализацию — это вся магия Spring Data.
+Spring Data JPA generates the implementation automatically — that's the magic of Spring Data.
 
-**service/TaskService.java** — методы:
+**service/TaskService.java** — methods:
 - `createTask(TaskRequest)`
-- `getAllTasks()`
-- `getTaskById(Long id)` → бросает `TaskNotFoundException`, если нет
+- `getAllTasks(String status)` — optional filter by status
+- `getTaskById(Long id)` → throws `TaskNotFoundException` if missing
 - `updateTask(Long id, TaskRequest)`
 - `deleteTask(Long id)`
 
-**controller/TaskController.java** — REST эндпоинты:
+**controller/TaskController.java** — REST endpoints:
 
-| Метод | Путь | Действие |
+| Method | Path | Action |
 |---|---|---|
-| POST | `/api/tasks` | создать задачу |
-| GET | `/api/tasks` | список всех задач |
-| GET | `/api/tasks/{id}` | получить одну задачу |
-| PUT | `/api/tasks/{id}` | обновить задачу |
-| DELETE | `/api/tasks/{id}` | удалить задачу |
-| GET | `/api/tasks?status=DONE` | фильтр по статусу (опционально) |
+| POST | `/api/tasks` | Create a task |
+| GET | `/api/tasks` | List all tasks |
+| GET | `/api/tasks/{id}` | Get one task |
+| PUT | `/api/tasks/{id}` | Update a task |
+| DELETE | `/api/tasks/{id}` | Delete a task |
+| GET | `/api/tasks?status=DONE` | Filter by status (optional) |
 
-Используй `@RestController`, `@RequestMapping("/api/tasks")`, `@Valid` на DTO в `@RequestBody`.
+Use `@RestController`, `@RequestMapping("/api/tasks")`, `@Valid` on DTO in `@RequestBody`.
 
-**exception/GlobalExceptionHandler.java** — `@ControllerAdvice`, который ловит `TaskNotFoundException` → возвращает 404, и `MethodArgumentNotValidException` → 400 с описанием ошибок валидации.
+**exception/GlobalExceptionHandler.java** — `@ControllerAdvice` catching `TaskNotFoundException` → returns 404, and `MethodArgumentNotValidException` → 400 with validation error descriptions.
 
 ---
 
-## Этап 4. Конфигурация (application.yml)
+## Phase 4. Configuration (application.yml)
 
-Создай `src/main/resources/application.yml` (можно удалить `application.properties`):
+Create `src/main/resources/application.yml` (delete `application.properties`):
 
 ```yaml
 spring:
+  application:
+    name: Cortex
+
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:taskmanager}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:cortex}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
+
   jpa:
     hibernate:
-      ddl-auto: none    # миграции через Liquibase
+      ddl-auto: none    # migrations via Liquibase
     show-sql: true
-  liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.xml
 
 management:
   endpoints:
@@ -160,68 +166,70 @@ management:
   endpoint:
     health:
       probes:
-        enabled: true     # включает /actuator/health/liveness и /readiness
+        enabled: true   # enables /actuator/health/liveness and /readiness
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
 ```
 
-**Важно:** значения вынесены через переменные окружения (`${DB_HOST:localhost}`) — это понадобится позже в Docker и Kubernetes, где база будет на другом хосте.
+> **Important:** values use environment variables (`${DB_HOST:localhost}`) — this will be needed later in Docker and Kubernetes where the database is on a different host.
 
 ---
 
-## Этап 5. Локальный запуск и проверка
+## Phase 5. Local Run & Verification
 
-Поставь PostgreSQL локально через Docker (это удобнее, чем устанавливать саму БД):
+Start PostgreSQL locally via Docker (easier than installing the database directly):
 
 ```bash
-docker run --name pg-taskmanager -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=taskmanager -p 5432:5432 -d postgres:16
+docker run --name pg-cortex -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=cortex -p 5432:5432 -d postgres:16
 ```
 
-Запусти приложение:
+Run the application:
 ```bash
 ./gradlew bootRun
 ```
 
-Проверь:
+Verify:
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - Health: http://localhost:8080/actuator/health
-- Создай задачу через Swagger UI или curl:
+- Create a task via Swagger UI or curl:
 
 ```bash
 curl -X POST http://localhost:8080/api/tasks \
   -H "Content-Type: application/json" \
-  -d '{"title":"Изучить Docker","description":"Multi-stage build","status":"TODO"}'
+  -d '{"title":"Learn Docker","description":"Multi-stage build","status":"TODO"}'
 ```
 
-✅ **Чекпоинт 1:** API работает локально, CRUD функционирует, Swagger открывается.
+> **Note:** The first app launch runs Liquibase migration `001-create-tasks-table.xml` which creates the `tasks` table automatically.
+
+✅ **Checkpoint 1:** API works locally, CRUD functions, Swagger opens.
 
 ---
 
-## Этап 6. Тесты
+## Phase 6. Tests
 
-Минимум для учебного проекта:
-- `TaskServiceTest` — юнит-тест с Mockito (`@Mock` репозиторий)
-- `TaskControllerTest` — `@WebMvcTest` + `MockMvc`
-- (опционально) интеграционный тест с **Testcontainers** — поднимает реальный Postgres в контейнере для теста
+Minimum for this learning project:
+- `TaskServiceTest` — unit test with Mockito (`@ExtendWith(MockitoExtension.class)`)
+- `TaskControllerTest` — `MockMvcBuilders.standaloneSetup()` (Spring Boot 4.x removed `@WebMvcTest` from auto-configuration, and `@MockBean`/`@MockitoBean` are no longer available)
+- Context load test — `@SpringBootTest` verifies the application context starts
 
 ```bash
 ./gradlew test
 ```
 
-✅ **Чекпоинт 2:** `./gradlew test` зелёный.
+✅ **Checkpoint 2:** `./gradlew test` is green (20 tests: 9 service + 10 controller + 1 context).
 
 ---
 
-## Этап 7. Dockerfile (multi-stage build)
+## Phase 7. Dockerfile (multi-stage build)
 
-Создай `Dockerfile` в корне проекта:
+Create `Dockerfile` in the project root:
 
 ```dockerfile
 # ---- Stage 1: Build ----
-FROM gradle:8.10-jdk17-alpine AS build
+FROM gradle:8.10.2-jdk17 AS build
 WORKDIR /app
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
@@ -230,35 +238,37 @@ COPY src ./src
 RUN ./gradlew bootJar --no-daemon
 
 # ---- Stage 2: Runtime ----
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 WORKDIR /app
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN groupadd --system spring && useradd --system --gid spring spring
 COPY --from=build /app/build/libs/*.jar app.jar
 USER spring:spring
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-**Зачем multi-stage:** в первой стадии нужен весь Gradle + JDK (тяжёлый образ), но в финальный образ это не нужно — там только JRE + готовый jar. Итоговый образ получается в разы меньше и без инструментов сборки (меньше поверхность атаки).
+**Why multi-stage:** the first stage needs the full Gradle + JDK (heavy image), but the final image only needs JRE + the built JAR. The result is much smaller and has no build tools (reduced attack surface).
 
-Собери и проверь:
+**Note on Apple Silicon:** Alpine variants (`-alpine`) don't have ARM64 images. Use `gradle:8.10.2-jdk17` and `eclipse-temurin:17-jre` (non-alpine) instead.
+
+Build and check:
 ```bash
-docker build -t task-manager:1.0 .
-docker images | grep task-manager   # глянь размер образа
+docker build -t cortex:1.0 .
+docker images | grep cortex   # check image size (~168MB)
 ```
 
 ---
 
-## Этап 8. docker-compose (приложение + база вместе)
+## Phase 8. Docker Compose (app + database together)
 
-Создай `docker-compose.yml` в корне:
+Create `docker-compose.yml` in the root:
 
 ```yaml
 services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: taskmanager
+      POSTGRES_DB: cortex
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -278,7 +288,7 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: taskmanager
+      DB_NAME: cortex
       DB_USER: postgres
       DB_PASSWORD: postgres
     depends_on:
@@ -289,56 +299,56 @@ volumes:
   pgdata:
 ```
 
-Запуск:
+Run:
 ```bash
 docker compose up --build
 ```
 
-✅ **Чекпоинт 3:** приложение и база поднимаются одной командой, Swagger доступен на :8080.
+✅ **Checkpoint 3:** App and database start with a single command, Swagger is accessible on `:8080`.
 
 ---
 
-## Этап 9. Kubernetes — локальный кластер
+## Phase 9. Kubernetes — Local Cluster
 
-### 9.1 Выбор инструмента
-- **Minikube** — рекомендую для первого знакомства, есть дашборд и аддоны
-- **kind** — лёгче и быстрее, понадобится позже для CI/CD
+### 9.1 Tool choice
+- **Minikube** — recommended for first exposure, has dashboard and addons
+- **kind** — lighter and faster, used later in CI/CD
 
-Установи Minikube и запусти:
+Start Minikube (already installed):
 ```bash
 minikube start --driver=docker --memory=4096 --cpus=2
 minikube addons enable ingress
 minikube addons enable metrics-server
-kubectl get nodes      # проверка, что кластер живой
+kubectl get nodes      # verify cluster is alive
 ```
 
-### 9.2 Манифесты — создай папку `k8s/` в проекте
+### 9.2 Manifests — create `k8s/` folder in the project
 
-**k8s/configmap.yaml** — нечувствительные настройки:
+**k8s/configmap.yaml** — non-sensitive settings:
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: task-manager-config
+  name: cortex-config
 data:
   DB_HOST: "postgres-service"
   DB_PORT: "5432"
-  DB_NAME: "taskmanager"
+  DB_NAME: "cortex"
 ```
 
-**k8s/secret.yaml** — пароль (в реальности базируется через `kubectl create secret`, но для учёбы можно и yaml):
+**k8s/secret.yaml** — password (in production managed via `kubectl create secret`, but YAML is fine for learning):
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: task-manager-secret
+  name: cortex-secret
 type: Opaque
 stringData:
   DB_USER: postgres
   DB_PASSWORD: postgres
 ```
 
-**k8s/postgres-deployment.yaml** — база данных как Deployment + Service:
+**k8s/postgres-deployment.yaml** — database as Deployment + Service:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -360,13 +370,13 @@ spec:
           env:
             - name: POSTGRES_DB
               valueFrom:
-                configMapKeyRef: { name: task-manager-config, key: DB_NAME }
+                configMapKeyRef: { name: cortex-config, key: DB_NAME }
             - name: POSTGRES_USER
               valueFrom:
-                secretKeyRef: { name: task-manager-secret, key: DB_USER }
+                secretKeyRef: { name: cortex-secret, key: DB_USER }
             - name: POSTGRES_PASSWORD
               valueFrom:
-                secretKeyRef: { name: task-manager-secret, key: DB_PASSWORD }
+                secretKeyRef: { name: cortex-secret, key: DB_PASSWORD }
           ports:
             - containerPort: 5432
 ---
@@ -381,31 +391,31 @@ spec:
     - port: 5432
 ```
 
-**k8s/app-deployment.yaml** — твоё приложение:
+**k8s/app-deployment.yaml** — your application:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: task-manager
+  name: cortex
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: task-manager
+      app: cortex
   template:
     metadata:
       labels:
-        app: task-manager
+        app: cortex
     spec:
       containers:
-        - name: task-manager
-          image: task-manager:1.0
-          imagePullPolicy: Never   # т.к. образ собран локально в Minikube
+        - name: cortex
+          image: cortex:1.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           envFrom:
-            - configMapRef: { name: task-manager-config }
-            - secretRef: { name: task-manager-secret }
+            - configMapRef: { name: cortex-config }
+            - secretRef: { name: cortex-secret }
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8080 }
             initialDelaySeconds: 30
@@ -418,27 +428,27 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: task-manager-service
+  name: cortex-service
 spec:
   type: NodePort
   selector:
-    app: task-manager
+    app: cortex
   ports:
     - port: 8080
       targetPort: 8080
       nodePort: 30080
 ```
 
-### 9.3 Сборка образа прямо внутри Minikube
+### 9.3 Build image inside Minikube
 
-Важный трюк — чтобы Minikube видел локально собранный образ без registry:
+Important trick — so Minikube can see your locally built image without a registry:
 
 ```bash
-eval $(minikube docker-env)      # переключает Docker CLI на демон внутри Minikube
-docker build -t task-manager:1.0 .
+eval $(minikube docker-env)      # switch Docker CLI to Minikube's daemon
+docker build -t cortex:1.0 .
 ```
 
-### 9.4 Деплой
+### 9.4 Deploy
 
 ```bash
 kubectl apply -f k8s/configmap.yaml
@@ -446,31 +456,31 @@ kubectl apply -f k8s/secret.yaml
 kubectl apply -f k8s/postgres-deployment.yaml
 kubectl apply -f k8s/app-deployment.yaml
 
-kubectl get pods -w        # смотри, как поды переходят в Running
+kubectl get pods -w        # watch pods transition to Running
 kubectl get svc
 
-minikube service task-manager-service --url   # получишь URL для проверки
+minikube service cortex-service --url   # get the URL to test
 ```
 
-✅ **Чекпоинт 4:** приложение крутится в Kubernetes, доступно по NodePort, поды устойчивы (liveness/readiness работают).
+✅ **Checkpoint 4:** Application runs in Kubernetes, accessible via NodePort, pods are stable (liveness/readiness work).
 
-Полезные команды для практики и дебага:
+Useful debugging commands:
 ```bash
 kubectl logs <pod-name>
 kubectl describe pod <pod-name>
 kubectl exec -it <pod-name> -- sh
-kubectl scale deployment task-manager --replicas=3
+kubectl scale deployment cortex --replicas=3
 ```
 
 ---
 
-## Этап 10. CI/CD — GitHub Actions
+## Phase 10. CI/CD — GitHub Actions
 
-### 10.1 Подготовка
-1. Создай репозиторий на GitHub, запушь проект.
-2. Registry — используем **GitHub Container Registry (ghcr.io)**: бесплатный, токен `GITHUB_TOKEN` создаётся автоматически в Actions, отдельная регистрация не нужна.
+### 10.1 Preparation
+1. Create a repository on GitHub, push the project.
+2. Registry — use **GitHub Container Registry (ghcr.io)**: free, `GITHUB_TOKEN` is auto-generated in Actions, no separate registration needed.
 
-### 10.2 Пайплайн — создай `.github/workflows/ci-cd.yaml`
+### 10.2 Pipeline — create `.github/workflows/ci-cd.yaml`
 
 ```yaml
 name: CI/CD
@@ -533,41 +543,48 @@ jobs:
         run: |
           docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}
           kind load docker-image ${{ env.IMAGE_NAME }}:${{ github.sha }} --name ci-cluster
-      - name: Deploy manifests
+      - name: Deploy PostgreSQL
         run: |
           kubectl apply -f k8s/configmap.yaml
           kubectl apply -f k8s/secret.yaml
           kubectl apply -f k8s/postgres-deployment.yaml
-          sed -i "s|image: task-manager:1.0|image: ${{ env.IMAGE_NAME }}:${{ github.sha }}|" k8s/app-deployment.yaml
-          kubectl apply -f k8s/app-deployment.yaml
-          kubectl wait --for=condition=ready pod -l app=task-manager --timeout=120s
+          kubectl wait --for=condition=ready pod -l app=postgres --timeout=120s
+      - name: Deploy application
+        run: |
+          sed "s|image: cortex:1.0|image: ${{ env.IMAGE_NAME }}:${{ github.sha }}|" k8s/app-deployment.yaml | kubectl apply -f -
+          kubectl wait --for=condition=ready pod -l app=cortex --timeout=120s
       - name: Smoke test
         run: |
-          kubectl port-forward svc/task-manager-service 8080:8080 &
+          kubectl port-forward svc/cortex-service 8080:8080 &
           sleep 5
           curl -f http://localhost:8080/actuator/health
+          curl -f -X POST http://localhost:8080/api/tasks \
+            -H "Content-Type: application/json" \
+            -d '{"title":"CI test","description":"Created in pipeline","status":"TODO"}'
 ```
 
-Что этот пайплайн делает по шагам:
-1. **test** — на каждый push/PR гоняет юнит-тесты
-2. **build-and-push** — только на `main`, после успешных тестов: собирает Docker-образ и пушит в `ghcr.io`
-3. **deploy-to-kind** — поднимает временный kind-кластер прямо в CI, разворачивает туда приложение и делает smoke-test (проверка `/actuator/health`) — это имитация "деплоя", безопасная для обучения, без реального продакшен-кластера
+What this pipeline does step by step:
+1. **test** — runs unit tests on every push/PR
+2. **build-and-push** — only on `main`, after successful tests: builds Docker image and pushes to `ghcr.io`
+3. **deploy-to-kind** — creates a temporary kind cluster in CI, deploys the app, and runs a smoke test (checks `/actuator/health`) — this simulates a deploy without a real production cluster
 
-✅ **Чекпоинт 5 (финал):** пуш в `main` → тесты → сборка образа → публикация в ghcr.io → деплой в эфемерный кластер → проверка health. Весь цикл DevOps замкнут.
-
----
-
-## Что писать в резюме/портфолио по итогам
-
-- Docker: multi-stage build, уменьшение размера образа, docker-compose для локальной среды
-- Kubernetes: Deployment, Service, ConfigMap, Secret, liveness/readiness probes, масштабирование
-- CI/CD: GitHub Actions, автоматические тесты, сборка и публикация образа в container registry, автоматический деплой в кластер
+✅ **Checkpoint 5 (final):** push to `main` → tests → build image → publish to ghcr.io → deploy to ephemeral cluster → health check. The full DevOps cycle is complete.
 
 ---
 
-## Если что-то пойдёт не так
+## Knowledge
 
-- `kubectl describe pod <name>` и `kubectl logs <name>` — первое, что смотреть при CrashLoopBackOff
-- Если под не видит образ — проверь `imagePullPolicy: Never` и что собирал образ именно в `minikube docker-env`
-- Если БД не подключается — проверь, что Service `postgres-service` резолвится (`kubectl exec -it <app-pod> -- nslookup postgres-service`)
-- Возвращайся ко мне на любом этапе — разберём конкретную ошибку/лог
+- Docker: multi-stage build, reduced image size, docker-compose for local development
+- Kubernetes: Deployment, Service, ConfigMap, Secret, liveness/readiness probes, scaling
+- CI/CD: GitHub Actions, automated tests, Docker image build and publish to container registry, automated deploy to cluster
+
+---
+
+## Troubleshooting
+
+- `kubectl describe pod <name>` and `kubectl logs <name>` — the first things to check on CrashLoopBackOff
+- If the pod can't find the image — check `imagePullPolicy: IfNotPresent` and that the image was built in Minikube's Docker daemon (`eval $(minikube docker-env)`)
+- If the database won't connect — check that the `postgres-service` resolves (`kubectl exec -it <app-pod> -- nslookup postgres-service`)
+- If tests fail — make sure you're not using removed APIs (`@MockBean`, `@MockitoBean`, `@WebMvcTest` from old packages — they're gone in Spring Boot 4.x)
+- If Liquibase fails to find changelog — use `db/changelog/db.changelog-master.xml` without `classpath:` prefix
+- Come back to me at any stage — we'll figure out the specific error/log together
