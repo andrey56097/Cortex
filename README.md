@@ -21,7 +21,7 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 | 2 | Swagger / OpenAPI | ✅ | springdoc 2.8.6 + Lombok added |
 | 3 | MVC Structure | ✅ | model, repository, service, controller, dto, exception |
 | 4 | Configuration | ✅ | application.yml + Liquibase migrations |
-| 5 | Local Run | ⏳ | |
+| 5 | Local Run | ✅ | All CRUD endpoints verified, Swagger UI, Liquibase migration |
 | 6 | Tests | ⏳ | |
 | 7 | Dockerfile | ⏳ | |
 | 8 | Docker Compose | ⏳ | |
