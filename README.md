@@ -23,7 +23,7 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 | 4 | Configuration | ✅ | application.yml + Liquibase migrations |
 | 5 | Local Run | ✅ | All CRUD endpoints verified, Swagger UI, Liquibase migration |
 | 6 | Tests | ✅ | 20/20 pass (Service: 9, Controller: 10, Context: 1) |
-| 7 | Dockerfile | ⏳ | |
+| 7 | Dockerfile | ✅ | Multi-stage build, 168MB image, verified |
 | 8 | Docker Compose | ⏳ | |
 | 9 | Kubernetes | ⏳ | |
 | 10 | CI/CD | ⏳ | |
