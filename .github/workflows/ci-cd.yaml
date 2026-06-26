@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  IMAGE_NAME: ghcr.io/${{ lower(github.repository_owner) }}/cortex
+  IMAGE_NAME: ghcr.io/andrey56097/cortex
 
 jobs:
   test:
