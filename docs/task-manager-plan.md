@@ -63,6 +63,9 @@ implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 // Lombok (опционально, но экономит много кода)
 compileOnly 'org.projectlombok:lombok'
 annotationProcessor 'org.projectlombok:lombok'
+
+// Liquibase (миграции схемы БД вместо ddl-auto)
+implementation 'org.liquibase:liquibase-core'
 ```
 
 После сохранения — Gradle подтянет зависимости (в IDE обычно автоматически, либо `./gradlew build`).
@@ -144,8 +147,10 @@ spring:
     password: ${DB_PASSWORD:postgres}
   jpa:
     hibernate:
-      ddl-auto: update    # для учебного проекта ок; в проде используют миграции (Flyway/Liquibase)
+      ddl-auto: none    # миграции через Liquibase
     show-sql: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
 
 management:
   endpoints:
