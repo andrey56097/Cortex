@@ -18,7 +18,7 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 |---|-------|--------|-------------|
 | 0 | Environment Setup | ✅ | Java 17, Docker, Git, Gradle wrapper |
 | 1 | Project Generation | ✅ | Spring Boot 4.1.0 with core dependencies |
-| 2 | Swagger / OpenAPI | ⏳ | |
+| 2 | Swagger / OpenAPI | ✅ | springdoc 2.8.6 + Lombok added |
 | 3 | MVC Structure | ⏳ | |
 | 4 | Configuration | ⏳ | |
 | 5 | Local Run | ⏳ | |
