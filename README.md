@@ -27,6 +27,11 @@ A hands-on learning project — building a Task Manager REST API from scratch an
 | 8 | Docker Compose | ✅ | app + PostgreSQL, single command, verified |
 | 9 | Kubernetes | ✅ | Minikube, ConfigMap, Secret, PostgreSQL + app deployments, 2 replicas, liveness/readiness probes |
 | 10 | CI/CD | ✅ | GitHub Actions: test → build & push to ghcr.io → deploy to kind + smoke test |
+| 11 | Oracle Cloud Instance | ⏳ | Provision ARM VM, open ports |
+| 12 | k3s Setup | ⏳ | Install k3s on the instance |
+| 13 | Production Manifests | ⏳ | Ingress, cert-manager, TLS |
+| 14 | Deploy-to-Oracle CI/CD | ⏳ | Auto-deploy on git push via kubectl |
+| 15 | Domain & HTTPS | ⏳ | Domain + Let's Encrypt |
 
 ---
 

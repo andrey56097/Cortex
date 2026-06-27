@@ -4,9 +4,10 @@
 
 Cortex is a learning project — a Task Manager REST API deployed to Kubernetes via CI/CD. The full plan is at `docs/task-manager-plan.md`.
 
-**All 10 phases are complete.** The project covers the full DevOps cycle: code → test → Docker → Docker Compose → Kubernetes → CI/CD.
+**All 10 phases are complete.** See `docs/task-manager-plan.md`.  
+**Phases 11-15 (Oracle Cloud):** see `docs/oracle-cloud-deploy-plan.md`.
 
-**Tech stack:** Java 17 + Spring Boot 4.1.0 + Gradle + PostgreSQL 16 + Liquibase + Swagger/OpenAPI + Docker + Kubernetes/Minikube + GitHub Actions CI/CD
+**Tech stack:** Java 17 + Spring Boot 4.1.0 + Gradle + PostgreSQL 16 + Liquibase + Swagger/OpenAPI + Docker + Kubernetes/Minikube + GitHub Actions CI/CD + Oracle Cloud + k3s
 
 ## Workflow Rules
 
